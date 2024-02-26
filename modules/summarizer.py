@@ -6,6 +6,9 @@ class Summarizer:
 
 
 	def __init__(self):
+		"""
+			Class constructor.
+		"""
 		model_name = "Falconsai/text_summarization"
 		self.model_token_seq_len = 512
 		self.summarizer_tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -13,12 +16,35 @@ class Summarizer:
 
 
 	def run(self, request):
-		
-		text = request["input"]
-		clean_text = self.process_input(text)
-		text_chunks = self.text_splitting(clean_text)
-		print(text_chunks)
-		# self.summarize_text(text)
+		"""
+			Main method for the summarizer class.
+
+			This method takes as input a request json, with the text to be summarized
+			in the input key. It then returns the summary of the text.
+
+			Parameters:
+			- request [json] : request json, containing information for the text to be summarized
+
+			Returns:
+			- result [json] : json object containing the summary of the input text.
+		"""
+		result = {}
+		try:
+			text = request["input"]
+			while True:
+				text_chunks = self.text_splitting(text)
+				summary = self.summarize_text(text_chunks)
+				if len(summary) == 1:
+					summary = summary[0]
+					break
+				else:
+					text = " ".join(summary).strip()
+			result["status"] = "ok"
+			result["summary"] = summary
+		except Exception as e:
+			result["status"] = "fail"
+			result["summary"] = str(e)
+		return result
 
 
 	def process_input(self, input_text):
@@ -34,10 +60,8 @@ class Summarizer:
 			Returns:
 			- clean_text (string) : processed text
 		"""
-		# Removing special characters
-		clean_text = re.sub(r"[^\w\s]", "", input_text)
 		# Remove any emoji characters
-		clean_text = re.sub(r"[\U00010000-\U0010ffff]", "", clean_text)
+		clean_text = re.sub(r"[\U00010000-\U0010ffff]", "", input_text)
 		return clean_text
 		
 
@@ -52,24 +76,64 @@ class Summarizer:
 			- input_text (string) : pre-chunked text
 
 			Return:
-			- text_chunks (list of strings) : list of text chunks
+			- text_chunks (list) : list of text chunks
 		"""
 		text_chunks = []
-		text_encoding = self.summarizer_tokenizer(input_text)
-		if len(text_encoding["input_ids"]) > self.model_token_seq_len:
-			pass
-		else:
-			text_decoded = self.summarizer_tokenizer.decode(text_encoding["input_ids"], skip_special_tokens=True)
-			text_chunks.append(text_decoded)
+		pattern = r'(?<=[.?!])'
+		splitted_text = re.split(pattern, input_text)
+		splitted_text = [s.strip() for s in splitted_text if s]
+		current_text_blob = []
+		for text_chunk in splitted_text:
+			current_text_blob.append(text_chunk)
+			blob_seq_size = self.compute_blob_seqence_size(current_text_blob)
+			if blob_seq_size > self.model_token_seq_len:
+				text = " ".join(current_text_blob[0:len(current_text_blob)-1]).strip()
+				text = self.process_input(text)
+				text_chunks.append(text)
+				while blob_seq_size > self.model_token_seq_len:
+					current_text_blob.pop(0)
+					blob_seq_size = self.compute_blob_seqence_size(current_text_blob)
+		if len(text_chunks) == 0:
+			text = " ".join(current_text_blob).strip()
+			text = self.process_input(text)
+			text_chunks.append(text)
 		return text_chunks
 
 
+	def compute_blob_seqence_size(self, text_list):
+		"""
+			Compute the sequence length of text blob
+
+			This method will compute how many tokens (based on the type of the model)
+			the given text blob is.
+
+			Parameters:
+			- input_list (list) : list of strings
+
+			Return:
+			- blob_size (int) : the number tokens in the sequence
+		"""
+		text = " ".join(text_list)
+		encoded_text = self.summarizer_tokenizer(text)
+		blob_size = len(encoded_text["input_ids"])
+		return blob_size
 
 
+	def summarize_text(self, text_chunks):
+		"""
+			Summarise text
 
-	def summarize_text(self, text):
+			This method uses the pre-trained LLM model to summarize a list of texts.
+			The summarizes are then returned as a list of text.
+
+			Parameters:
+			- text_chunks (list) : list of texts to be summarized.
+
+			Return:
+			- summary (list) : list of summaries of the input text.
+		"""
+		summaries = self.summarizer_model(text_chunks)
+		summary = [x["summary_text"] for x in summaries]
+		return summary
 
 
-		summary = self.summarizer_model(text)
-
-		print(summary)
