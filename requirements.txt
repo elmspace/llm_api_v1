@@ -4,3 +4,5 @@ torch==2.1.2
 transformers==4.38.1
 datasets==2.17.1
 cachetools
+nltk==3.8.1
+farm-haystack[inference]

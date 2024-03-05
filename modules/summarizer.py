@@ -1,4 +1,5 @@
 import re
+import os
 from transformers import pipeline
 from transformers import AutoTokenizer
 
@@ -10,7 +11,8 @@ class Summarizer:
 			Class constructor.
 		"""
 		model_name = "Falconsai/text_summarization"
-		self.model_token_seq_len = 512
+		self.raw_data_path = "./raw_data/"
+		self.model_token_seq_len = 500
 		self.summarizer_tokenizer = AutoTokenizer.from_pretrained(model_name)
 		self.summarizer_model = pipeline("summarization", model=model_name)
 
@@ -30,9 +32,10 @@ class Summarizer:
 		"""
 		result = {}
 		try:
-			text = request["input"]
+			text = self.get_text(request["source"], request["file_name"])
 			while True:
 				text_chunks = self.text_splitting(text)
+				print(len(text_chunks))
 				summary = self.summarize_text(text_chunks)
 				if len(summary) == 1:
 					summary = summary[0]
@@ -45,6 +48,15 @@ class Summarizer:
 			result["status"] = "fail"
 			result["summary"] = str(e)
 		return result
+
+
+	def get_text(self, source, file_name):
+		"""
+		"""
+		raw_data_source = self.raw_data_path + source +"/"+ file_name
+		with open(raw_data_source, "r") as text_file:
+			text = text_file.read()
+		return text
 
 
 	def process_input(self, input_text):
@@ -91,7 +103,8 @@ class Summarizer:
 				text = self.process_input(text)
 				text_chunks.append(text)
 				while blob_seq_size > self.model_token_seq_len:
-					current_text_blob.pop(0)
+					# current_text_blob.pop(0)
+					current_text_blob = []
 					blob_seq_size = self.compute_blob_seqence_size(current_text_blob)
 		if len(text_chunks) == 0:
 			text = " ".join(current_text_blob).strip()
