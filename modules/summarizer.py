@@ -10,14 +10,14 @@ class Summarizer:
 		"""
 			Class constructor.
 		"""
-		model_name = "Falconsai/text_summarization"
+		model_name = "facebook/bart-large-cnn"
 		self.raw_data_path = "./raw_data/"
 		self.model_token_seq_len = 500
 		self.summarizer_tokenizer = AutoTokenizer.from_pretrained(model_name)
 		self.summarizer_model = pipeline("summarization", model=model_name)
 
 
-	def run(self, request):
+	def run(self, text, summary_size):
 		"""
 			Main method for the summarizer class.
 
@@ -25,38 +25,30 @@ class Summarizer:
 			in the input key. It then returns the summary of the text.
 
 			Parameters:
-			- request [json] : request json, containing information for the text to be summarized
+			- text [string] : text to be summarize
+			- summary_size[string] : default = small, size of the summary text
 
 			Returns:
-			- result [json] : json object containing the summary of the input text.
+			- text [string] : summary text.
 		"""
-		result = {}
 		try:
-			text = self.get_text(request["source"], request["file_name"])
 			while True:
 				text_chunks = self.text_splitting(text)
-				print(len(text_chunks))
 				summary = self.summarize_text(text_chunks)
-				if len(summary) == 1:
+				if (summary_size=="small") and (len(summary) == 1):
 					summary = summary[0]
+					break
+				elif (summary_size=="medium") and (len(summary) <= 5):
+					summary = " ".join(summary)
+					break
+				elif (summary_size=="large") and (len(summary) <= 10):
+					summary = " ".join(summary)
 					break
 				else:
 					text = " ".join(summary).strip()
-			result["status"] = "ok"
-			result["summary"] = summary
 		except Exception as e:
-			result["status"] = "fail"
-			result["summary"] = str(e)
-		return result
-
-
-	def get_text(self, source, file_name):
-		"""
-		"""
-		raw_data_source = self.raw_data_path + source +"/"+ file_name
-		with open(raw_data_source, "r") as text_file:
-			text = text_file.read()
-		return text
+			print(str(e))
+		return summary
 
 
 	def process_input(self, input_text):

@@ -1,4 +1,5 @@
 import os
+from transformers import pipeline
 from haystack.nodes import FARMReader
 from haystack.utils import print_answers
 from haystack.nodes import BM25Retriever
@@ -6,14 +7,37 @@ from haystack.pipelines import ExtractiveQAPipeline
 from haystack.document_stores import InMemoryDocumentStore
 from haystack.pipelines.standard_pipelines import TextIndexingPipeline
 
+
 class Q_and_A:
 
 
 	def __init__(self):
 		self.document_store = InMemoryDocumentStore(use_bm25=True)
-		self.raw_data_path = "./raw_data/"		
+		self.raw_data_path = "./raw_data/"
 		self.data_store_path = "./data_store/"
+		# Single reader mode
+		model_name = "deepset/roberta-base-squad2"
+		self.single_agent = pipeline('question-answering', model=model_name, tokenizer=model_name)
 
+
+	def run_single(self, question, context):
+		"""
+			Main method for the signle context question and answering class.
+
+			This method takes as input a <source> name and a <question>, and loads
+			the relevant document and uses an LLM model to find the answe.
+
+			Parameters:
+			- question [string] : Question to be answered using the context.
+			- context [string] : Context text to be used to extract answer from.
+
+			Returns:
+			- output [json] : Response object.
+		"""
+		input_data = {'question': question, 'context': context}
+		output = self.single_agent(input_data)
+		return output
+		
 
 	def run(self, request):
 		"""
